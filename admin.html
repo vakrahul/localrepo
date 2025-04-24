@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Honeypot Admin Dashboard</title>
+    <!-- Firebase SDK -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.2/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.2/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.2/firebase-database-compat.min.js"></script>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Arial', sans-serif;
+        }
+        .dashboard-container {
+            padding: 20px;
+        }
+        .card {
+            margin-bottom: 20px;
+            border: none;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        table {
+            font-size: 14px;
+        }
+        .badge-ip {
+            font-family: monospace;
+        }
+        .sidebar {
+            background-color: #343a40;
+            color: white;
+            min-height: 100vh;
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 10px 20px;
+        }
+        .sidebar .nav-link:hover {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .sidebar .nav-link.active {
+            color: white;
+            background-color: #0d6efd;
+        }
+        .stats-box {
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px;
+        }
+        .stats-box h1 {
+            font-size: 2.5rem;
+            margin-bottom: 5px;
+        }
+        .stats-box p {
+            margin-bottom: 0;
+            color: #6c757d;
+        }
+        .educational-notice {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .login-card {
+            max-width: 400px;
+            width: 100%;
+        }
+        .login-logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .login-form {
+            padding: 20px;
+        }
+        .honeypot-logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #343a40;
+        }
+        .logo-accent {
+            color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Container (Initially Visible) -->
+    <div id="loginContainer" class="login-container">
+        <div class="card login-card">
+            <div class="card-body login-form">
+                <div class="login-logo">
+                    <div class="honeypot-logo">Honey<span class="logo-accent">Pot</span> Admin</div>
+                    <p class="text-muted small">Security Research Dashboard</p>
+                </div>
+                <div class="alert alert-info mb-4" role="alert">
+                    <small>This dashboard is for authorized security researchers only. All login attempts are logged.</small>
+                </div>
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label for="adminEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="adminEmail" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="adminPassword" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="adminPassword" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="rememberMe">
+                        <label class="form-check-label" for="rememberMe">Remember me</label>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Sign In</button>
+                    </div>
+                    <div id="loginError" class="alert alert-danger mt-3" style="display: none;"></div>
+                </form>
+                <div class="mt-3 text-center">
+                    <small><a href="#" id="forgotPassword">Forgot password?</a></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Container (Initially Hidden) -->
+    <div id="dashboardContainer" class="container-fluid" style="display: none;">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <div class="px-3 py-4 mb-3">
+                        <h5>Honeypot Admin</h5>
+                        <p class="small text-muted">Educational Project Dashboard</p>
+                    </div>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#">
+                                Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                Login Attempts
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                Brute Force Attacks
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                IP Analytics
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                Settings
+                            </a>
+                        </li>
+                        <li class="nav-item mt-5">
+                            <a class="nav-link text-danger" href="#" id="logoutButton">
+                                Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-md-9 ms-sm-auto col-lg-10 px-md-4 dashboard-container">
+                <div class="educational-notice">
+                    <strong>Educational Notice:</strong> This honeypot is for educational purposes only. Data collected here should be used responsibly and in accordance with applicable laws and regulations.
+                </div>
+                
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Honeypot Dashboard</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="dropdown me-2">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="adminDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                <span id="currentAdminEmail">admin@example.com</span>
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="adminDropdown">
+                                <li><a class="dropdown-item" href="#">Profile</a></li>
+                                <li><a class="dropdown-item" href="#">Account Settings</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" id="logoutDropdownItem">Logout</a></li>
+                            </ul>
+                        </div>
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary">Export Data</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary">Settings</button>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="refreshData">
+                            <span class="bi bi-arrow-repeat"></span>
+                            Refresh Data
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Stats Overview -->
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="stats-box bg-primary text-white">
+                                <h1 id="totalAttempts">0</h1>
+                                <p>Total Login Attempts</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="stats-box bg-danger text-white">
+                                <h1 id="bruteForceAttacks">0</h1>
+                                <p>Detected Brute Force Attacks</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="stats-box bg-warning text-white">
+                                <h1 id="uniqueIPs">0</h1>
+                                <p>Unique IP Addresses</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="stats-box bg-success text-white">
+                                <h1 id="todayAttempts">0</h1>
+                                <p>Attempts Today</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Charts -->
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                Login Attempts Over Time
+                            </div>
+                            <div class="card-body">
+                                <canvas id="attemptsChart" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                Common Usernames
+                            </div>
+                            <div class="card-body">
+                                <canvas id="usernamesChart" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Login Attempts -->
+                <div class="card mt-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Recent Login Attempts</span>
+                        <button class="btn btn-sm btn-outline-secondary">View All</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Username</th>
+                                        <th>Password</th>
+                                        <th>IP Address</th>
+                                        <th>User Agent</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attemptsTableBody">
+                                    <!-- Table rows will be inserted here by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Detected Brute Force Attacks -->
+                <div class="card mt-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Detected Brute Force Attacks</span>
+                        <button class="btn btn-sm btn-outline-secondary">View All</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>IP Address</th>
+                                        <th>Attempt Count</th>
+                                        <th>Time Window (sec)</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bruteForceTableBody">
+                                    <!-- Table rows will be inserted here by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Initialize Firebase
+        // NOTE: You need to replace these with your actual Firebase configuration
+        const firebaseConfig = {
+  apiKey: "AIzaSyCAYMAdQR-7AjVgs3rnOyRg4Y3SfuAvhwc",
+  authDomain: "heone-71804.firebaseapp.com",
+  databaseURL: "https://heone-71804-default-rtdb.firebaseio.com",
+  projectId: "heone-71804",
+  storageBucket: "heone-71804.firebasestorage.app",
+  messagingSenderId: "79918489689",
+  appId: "1:79918489689:web:d6837f0bd8112087d49148"
+};
+        
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+        
+        // Admin credentials
+        const ADMIN_EMAIL = "123@gmail.com";
+        const ADMIN_PASSWORD = "123";
+        
+        // Initialize statistics
+        let totalAttempts = 0;
+        let bruteForceAttacks = 0;
+        let uniqueIPs = new Set();
+        let todayAttempts = 0;
+        
+        // Charts
+        let attemptsChart;
+        let usernamesChart;
+        
+        // Function to handle admin login
+        function handleAdminLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            const loginError = document.getElementById('loginError');
+            
+            // Basic validation
+            if (!email || !password) {
+                loginError.textContent = "Please enter both email and password";
+                loginError.style.display = "block";
+                return;
+            }
+            
+            // For demo purposes, we'll use hardcoded credentials
+            // In a real app, you would use Firebase Auth properly
+            if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+                // Hide login, show dashboard
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('dashboardContainer').style.display = 'block';
+                document.getElementById('currentAdminEmail').textContent = email;
+                
+                // Load dashboard data
+                fetchData();
+                
+                // Store auth state in session storage
+                sessionStorage.setItem('adminLoggedIn', 'true');
+                sessionStorage.setItem('adminEmail', email);
+                
+                // Log this admin login (but don't store the password)
+                logAdminLogin(email);
+            } else {
+                // Show error
+                loginError.textContent = "Invalid email or password";
+                loginError.style.display = "block";
+                
+                // Log the failed attempt
+                logFailedAdminLogin(email);
+            }
+        }
+        
+        // Function to log admin login
+        function logAdminLogin(email) {
+            const loginData = {
+                timestamp: new Date().toISOString(),
+                email: email,
+                success: true,
+                ip: "127.0.0.1", // In real app, you'd get the actual IP
+                userAgent: navigator.userAgent
+            };
+            
+            // Push to admin_logins in database
+            database.ref('adminLogins').push().set(loginData);
+        }
+        
+        // Function to log failed admin login
+        function logFailedAdminLogin(email) {
+            const loginData = {
+                timestamp: new Date().toISOString(),
+                email: email,
+                success: false,
+                ip: "127.0.0.1", // In real app, you'd get the actual IP
+                userAgent: navigator.userAgent
+            };
+            
+            // Push to admin_login_attempts in database
+            database.ref('adminLoginAttempts').push().set(loginData);
+        }
+        
+        // Function to handle admin logout
+        function handleLogout() {
+            // Clear session storage
+            sessionStorage.removeItem('adminLoggedIn');
+            sessionStorage.removeItem('adminEmail');
+            
+            // Show login, hide dashboard
+            document.getElementById('loginContainer').style.display = 'flex';
+            document.getElementById('dashboardContainer').style.display = 'none';
+            
+            // Clear form fields
+            document.getElementById('adminEmail').value = '';
+            document.getElementById('adminPassword').value = '';
+            document.getElementById('loginError').style.display = 'none';
+        }
+        
+        // Function to format date and time
+        function formatDateTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+        
+        // Function to get only today's date portion for comparing timestamps
+        function getToday() {
+            const today = new Date();
+            return today.toISOString().split('T')[0];
+        }
+        
+        // Function to update the stats in the UI
+        function updateStats() {
+            document.getElementById('totalAttempts').textContent = totalAttempts;
+            document.getElementById('bruteForceAttacks').textContent = bruteForceAttacks;
+            document.getElementById('uniqueIPs').textContent = uniqueIPs.size;
+            document.getElementById('todayAttempts').textContent = todayAttempts;
+        }
+        
+        // Function to update charts
+        function updateCharts(loginAttempts, bruteForceData) {
+            // Process data for charts
+            const timeLabels = [];
+            const attemptCounts = [];
+            const usernameCounts = {};
+            
+            // Group attempts by hour
+            const attemptsByHour = {};
+            
+            loginAttempts.forEach(attempt => {
+                const date = new Date(attempt.timestamp);
+                const hourKey = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:00`;
+                
+                if (!attemptsByHour[hourKey]) {
+                    attemptsByHour[hourKey] = 0;
+                }
+                attemptsByHour[hourKey]++;
+                
+                // Count usernames
+                if (!usernameCounts[attempt.username]) {
+                    usernameCounts[attempt.username] = 0;
+                }
+                usernameCounts[attempt.username]++;
+            });
+            
+            // Sort hours and prepare chart data
+            Object.keys(attemptsByHour).sort().forEach(hour => {
+                timeLabels.push(hour);
+                attemptCounts.push(attemptsByHour[hour]);
+            });
+            
+            // Sort usernames by count (descending) and take top 10
+            const topUsernames = Object.entries(usernameCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            
+            // Update attempts over time chart
+            if (attemptsChart) {
+                attemptsChart.destroy();
+            }
+            
+            const attemptsCtx = document.getElementById('attemptsChart').getContext('2d');
+            attemptsChart = new Chart(attemptsCtx, {
+                type: 'line',
+                data: {
+                    labels: timeLabels,
+                    datasets: [{
+                        label: 'Login Attempts',
+                        data: attemptCounts,
+                        fill: false,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            
+            // Update usernames chart
+            if (usernamesChart) {
+                usernamesChart.destroy();
+            }
+            
+            const usernamesCtx = document.getElementById('usernamesChart').getContext('2d');
+            usernamesChart = new Chart(usernamesCtx, {
+                type: 'bar',
+                data: {
+                    labels: topUsernames.map(item => item[0]),
+                    datasets: [{
+                        label: 'Frequency',
+                        data: topUsernames.map(item => item[1]),
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgb(54, 162, 235)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Function to update the login attempts table
+        function updateAttemptsTable(attempts) {
+            const tableBody = document.getElementById('attemptsTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            
+            // Get the 10 most recent attempts
+            attempts.slice(0, 10).forEach(attempt => {
+                const row = document.createElement('tr');
+                
+                // Add suspicious class if flagged
+                if (attempt.suspiciousActivity) {
+                    row.classList.add('table-danger');
+                }
+                
+                row.innerHTML = `
+                    <td>${formatDateTime(attempt.timestamp)}</td>
+                    <td>${attempt.username}</td>
+                    <td>${attempt.password}</td>
+                    <td><span class="badge bg-secondary badge-ip">${attempt.ip}</span></td>
+                    <td class="text-truncate" style="max-width: 150px;" title="${attempt.userAgent}">${attempt.userAgent}</td>
+                    <td>${attempt.suspiciousActivity ? 
+                        '<span class="badge bg-danger">Suspicious</span>' : 
+                        '<span class="badge bg-secondary">Normal</span>'}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // Function to update the brute force attacks table
+        function updateBruteForceTable(attacks) {
+            const tableBody = document.getElementById('bruteForceTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            
+            attacks.forEach(attack => {
+                const row = document.createElement('tr');
+                row.classList.add('table-danger');
+                
+                row.innerHTML = `
+                    <td>${formatDateTime(attack.timestamp)}</td>
+                    <td><span class="badge bg-danger badge-ip">${attack.ip}</span></td>
+                    <td>${attack.attemptCount}</td>
+                    <td>${(attack.timeWindow / 1000).toFixed(2)}s</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary">Details</button>
+                        <button class="btn btn-sm btn-outline-danger">Block IP</button>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // Function to fetch and process data from Firebase
+        function fetchData() {
+            // Reset counters
+            totalAttempts = 0;
+            bruteForceAttacks = 0;
+            uniqueIPs = new Set();
+            todayAttempts = 0;
+            const today = getToday();
+            
+            // Arrays to store data for tables and charts
+            const loginAttemptsArray = [];
+            const bruteForceArray = [];
+            
+            // Fetch login attempts
+            database.ref('loginAttempts').orderByChild('timestamp').limitToLast(100).once('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    snapshot.forEach((childSnapshot) => {
+                        const attempt = childSnapshot.val();
+                        loginAttemptsArray.push(attempt);
+                        
+                        totalAttempts++;
+                        uniqueIPs.add(attempt.ip);
+                        
+                        // Check if attempt is from today
+                        if (attempt.timestamp.startsWith(today)) {
+                            todayAttempts++;
+                        }
+                    });
+                }
+                
+                // Fetch brute force detections
+                database.ref('bruteForceDetections').orderByChild('timestamp').limitToLast(50).once('value', (snapshot) => {
+                    if (snapshot.exists()) {
+                        snapshot.forEach((childSnapshot) => {
+                            const attack = childSnapshot.val();
+                            bruteForceArray.push(attack);
+                            
+                            bruteForceAttacks++;
+                            uniqueIPs.add(attack.ip);
+                        });
+                    }
+                    
+                    // Sort arrays by timestamp (most recent first)
+                    loginAttemptsArray.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    bruteForceArray.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    
+                    // Update UI
+                    updateStats();
+                    updateAttemptsTable(loginAttemptsArray);
+                    updateBruteForceTable(bruteForceArray);
+                    updateCharts(loginAttemptsArray, bruteForceArray);
+                });
+            });
+        }
+        
+        // Check if user is already logged in (from session storage)
+        function checkLoginStatus() {
+            const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
+            const adminEmail = sessionStorage.getItem('adminEmail');
+            
+            if (isLoggedIn === 'true' && adminEmail) {
+                // Show dashboard, hide login
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('dashboardContainer').style.display = 'block';
+                document.getElementById('currentAdminEmail').textContent = adminEmail;
+                
+                // Load dashboard data
+                fetchData();
+            }
+        }
+        
+        // Initialize data on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set up login form submission
+            document.getElementById('loginForm').addEventListener('submit', handleAdminLogin);
+            
+            // Set up logout buttons
+            document.getElementById('logoutButton').addEventListener('click', handleLogout);
+            document.getElementById('logoutDropdownItem').addEventListener('click', handleLogout);
+            
+            // Handle forgot password
+            document.getElementById('forgotPassword').addEventListener('click', function(e) {
+                e.preventDefault();
+                alert('For this demo, the admin credentials are:\nEmail: ' + ADMIN_EMAIL + '\nPassword: ' + ADMIN_PASSWORD);
+            });
+            
+            // Set up refresh button
+            document.getElementById('refreshData').addEventListener('click', fetchData);
+            
+            // Check if user is already logged in
+            checkLoginStatus();
+            
+            // Auto-refresh every 30 seconds if logged in
+            setInterval(function() {
+                if (document.getElementById('dashboardContainer').style.display !== 'none') {
+                    fetchData();
+                }
+            }, 30000);
+        });
+    </script>
+</body>
+</html>
