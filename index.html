@@ -483,14 +483,14 @@
     <script>
         // Initialize Firebase with the actual config from the admin dashboard
         const firebaseConfig = {
-  apiKey: "AIzaSyCAYMAdQR-7AjVgs3rnOyRg4Y3SfuAvhwc",
-  authDomain: "heone-71804.firebaseapp.com",
-  databaseURL: "https://heone-71804-default-rtdb.firebaseio.com",
-  projectId: "heone-71804",
-  storageBucket: "heone-71804.firebasestorage.app",
-  messagingSenderId: "79918489689",
-  appId: "1:79918489689:web:d6837f0bd8112087d49148"
-};
+            apiKey: "AIzaSyBhQ3sQO8AelmNJfi4qiJotqoo8mHCs5f4",
+            authDomain: "demohoney-f10c7.firebaseapp.com",
+            databaseURL: "https://demohoney-f10c7-default-rtdb.firebaseio.com",
+            projectId: "demohoney-f10c7",
+            storageBucket: "demohoney-f10c7.firebasestorage.app",
+            messagingSenderId: "1077457557065",
+            appId: "1:1077457557065:web:a1b6841b4715742bbbd198"
+        };
         
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
@@ -864,52 +864,88 @@
             // This is a simplified version
             return username + '@example.com';
         }
-        
-        // Password recovery form submission
-        document.getElementById('passwordRecoveryForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const recoveryEmail = document.getElementById('recoveryEmail').value;
-            const recoveryMessage = document.getElementById('recoveryMessage');
-            recoveryMessage.className = 'alert alert-info';
-            recoveryMessage.style.display = 'block';
-            recoveryMessage.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Processing your request...';
-            
-            // In a real application, you would send a password reset email via Firebase Auth
-            auth.sendPasswordResetEmail(recoveryEmail)
-                .then(() => {
-                    recoveryMessage.className = 'alert alert-success';
-                    recoveryMessage.innerHTML = '<i class="fas fa-check-circle me-2"></i>Password reset link sent to your email address.';
-                    
-                    // Log the recovery attempt
-                    database.ref('passwordResets').push({
-                        email: recoveryEmail,
-                        timestamp: new Date().toISOString(),
-                        ip: clientIP,
-                        userAgent: clientInfo.userAgent
-                    });
-                })
-                .catch((error) => {
-                    console.error('Password reset error:', error);
-                    
-                    if (error.code === 'auth/user-not-found') {
-                        recoveryMessage.className = 'alert alert-warning';
-                        recoveryMessage.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>No account found with this email address.';
-                    } else {
-                        recoveryMessage.className = 'alert alert-danger';
-                        recoveryMessage.innerHTML = '<i class="fas fa-times-circle me-2"></i>Error: ' + error.message;
-                    }
-                    
-                    // Log failed recovery attempt
-                    database.ref('failedPasswordResets').push({
-                        email: recoveryEmail,
-                        timestamp: new Date().toISOString(),
-                        error: error.code,
-                        ip: clientIP,
-                        userAgent: clientInfo.userAgent
-                    });
+       // Password recovery form submission
+document.getElementById('passwordRecoveryForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const recoveryEmail = document.getElementById('recoveryEmail').value;
+    const recoveryMessage = document.getElementById('recoveryMessage');
+    recoveryMessage.className = 'alert alert-info';
+    recoveryMessage.style.display = 'block';
+    recoveryMessage.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Processing your request...';
+    
+    // First check if the user exists in the database
+    database.ref('users').orderByChild('email').equalTo(recoveryEmail).once('value')
+        .then((snapshot) => {
+            // If user doesn't exist, show appropriate message and stop the process
+            if (!snapshot.exists()) {
+                recoveryMessage.className = 'alert alert-warning';
+                recoveryMessage.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>No account found with this email address. Please <a href="signup.html" class="alert-link">sign up</a> first to create an account.';
+                
+                // Log failed recovery attempt for non-existent account
+                database.ref('failedPasswordResets').push({
+                    email: recoveryEmail,
+                    timestamp: new Date().toISOString(),
+                    error: 'user-not-found',
+                    reason: 'Account not registered',
+                    ip: clientIP,
+                    userAgent: clientInfo.userAgent
                 });
+                return Promise.reject('user-not-found');
+            }
+            
+            // User exists, proceed with password reset
+            return auth.sendPasswordResetEmail(recoveryEmail);
+        })
+        .then(() => {
+            // Success - reset email sent
+            recoveryMessage.className = 'alert alert-success';
+            recoveryMessage.innerHTML = '<i class="fas fa-check-circle me-2"></i>Password reset link sent to your email address.';
+            
+            // Log the successful recovery attempt
+            database.ref('passwordResets').push({
+                email: recoveryEmail,
+                timestamp: new Date().toISOString(),
+                ip: clientIP,
+                userAgent: clientInfo.userAgent
+            });
+        })
+        .catch((error) => {
+            // Skip further error handling if we already handled the user-not-found case
+            if (error === 'user-not-found') return;
+            
+            console.error('Password reset error:', error);
+            
+            if (error.code === 'auth/user-not-found') {
+                recoveryMessage.className = 'alert alert-warning';
+                recoveryMessage.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>No account found with this email address. Please <a href="signup.html" class="alert-link">sign up</a> first to create an account.';
+            } else {
+                recoveryMessage.className = 'alert alert-danger';
+                recoveryMessage.innerHTML = '<i class="fas fa-times-circle me-2"></i>Error: ' + error.message;
+            }
+            
+            // Log failed recovery attempt
+            database.ref('failedPasswordResets').push({
+                email: recoveryEmail,
+                timestamp: new Date().toISOString(),
+                error: error.code || 'unknown-error',
+                ip: clientIP,
+                userAgent: clientInfo.userAgent
+            });
         });
+});
+
+// Update the password recovery modal content to explicitly mention signup requirement
+const passwordRecoveryModal = document.getElementById('passwordRecoveryModal');
+const modalBody = passwordRecoveryModal.querySelector('.modal-body');
+
+// Add a note about needing to sign up first
+const signupNote = document.createElement('div');
+signupNote.className = 'alert alert-info mb-3';
+signupNote.innerHTML = '<i class="fas fa-info-circle me-2"></i><strong>Important:</strong> You must have an account before resetting your password. If you don\'t have an account, please <a href="signup.html" class="alert-link">sign up</a> first.';
+
+// Insert the note at the beginning of the modal body
+modalBody.insertBefore(signupNote, modalBody.firstChild);
         
         // Contact support button handler
         document.getElementById('contactSupportBtn').addEventListener('click', function() {
